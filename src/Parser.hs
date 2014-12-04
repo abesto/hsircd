@@ -10,14 +10,11 @@ type Parser st r = Parsec String st r
 
 params :: Parser st [String]
 params = option [] $ choice $ map try $ allParams : [nParams n | n <- [0..14]]
-
-nParams :: Int -> Parser st [String]
-nParams n = (++) <$> (count n $ space *> middle)
-            <*> option [] (space *> char ':' *> ((\x -> [x]) <$> trailing))
-
-allParams :: Parser st [String]
-allParams = (++) <$> (count 14 $ space *> middle)
-         <*> option [] (space *> (optional $ char ':') *> ((\x -> [x]) <$> trailing))
+    where nParams n = (++) <$> middles n
+                      <*> option [] (space *> char ':' *> ((\x -> [x]) <$> trailing))
+          allParams = (++) <$> middles 14
+                      <*> option [] (space *> (optional $ char ':') *> ((\x -> [x]) <$> trailing))
+          middles n = count n $ space *> middle
 
 nospcrlfcl :: Parser st Char
 nospcrlfcl = noneOf "\NUL\CR\LF :"

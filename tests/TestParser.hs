@@ -33,8 +33,7 @@ parserTests = testGroup "Parser"
         , assertParseError channelParser "asdf" ["channel prefix"]
         ]
     , testGroup "Command parameters"
-      [ assertParse (nParams 2) " nParams 2" ["nParams", "2"]
-      , assertParse params " params x y z" ["params", "x", "y", "z"]
+      [ assertParse params " params x y z" ["params", "x", "y", "z"]
       , assertParse params "" []
       , assertParse params "  " []
       , assertParse params " :a b c" ["a b c"]
