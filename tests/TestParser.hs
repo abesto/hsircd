@@ -32,4 +32,14 @@ parserTests = testGroup "Parser"
         , assertParseError channelParser "&" ["channel name", "Channel name must not be empty"]
         , assertParseError channelParser "asdf" ["channel prefix"]
         ]
+    , testGroup "Command parameters"
+      [ assertParse (nParams 2) " nParams 2" ["nParams", "2"]
+      , assertParse params " params x y z" ["params", "x", "y", "z"]
+      , assertParse params "" []
+      , assertParse params "  " []
+      , assertParse params " :a b c" ["a b c"]
+      , assertParse params " a b :c d e" ["a", "b", "c d e"]
+      , assertParse params " 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17"
+                           ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15 16 17"]
+      ]
     ]
