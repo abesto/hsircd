@@ -9,12 +9,11 @@ import Control.Applicative ((<$>), (<*>), (*>))
 type Parser st r = Parsec String st r
 
 params :: Parser st [String]
-params = option [] $ choice $ map try $ allParams : [nParams n | n <- [0..14]]
-    where nParams n = (++) <$> middles n
-                      <*> option [] (space *> char ':' *> ((\x -> [x]) <$> trailing))
-          allParams = (++) <$> middles 14
-                      <*> option [] (space *> (optional $ char ':') *> ((\x -> [x]) <$> trailing))
-          middles n = count n $ space *> middle
+params = option [] $ choice $ map try $ [nParams n | n <- [0..15]]
+    where nParams n = (++) <$> (count n $ space *> middle) <*> option [] (space *> trailingColon n *> trailingAsList)
+          trailingColon 14 = optional $ char ':'
+          trailingColon _ = char ':' >> return ()
+          trailingAsList = (:[]) <$> trailing
 
 nospcrlfcl :: Parser st Char
 nospcrlfcl = noneOf "\NUL\CR\LF :"
