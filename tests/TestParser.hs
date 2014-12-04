@@ -37,6 +37,7 @@ parserTests = testGroup "Parser"
       , assertParse params "" []
       , assertParse params "  " []
       , assertParse params " :a b c" ["a b c"]
+      , assertParse params " ::a b c" [":a b c"]
       , assertParse params " a b :c d e" ["a", "b", "c d e"]
       , assertParse params " 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17"
                            ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15 16 17"]
