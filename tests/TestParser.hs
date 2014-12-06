@@ -6,10 +6,12 @@ import Test.Tasty.HUnit
 import Data.Function (on)
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as PE
+import Control.Applicative ((<*))
 
 import Parser
 import Model.Channel
 import Model.Command
+import Model.Prefix
 
 instance Eq P.ParseError where
   (==) = (==) `on` show
@@ -53,5 +55,46 @@ parserTests = testGroup "Parser"
       , assertParse command "001" rpl_welcome
       , assertParseError command "" ["", "command"]
       , assertParseError command "0123" ["'3'", "end of word"]
+      ]
+    , testGroup "shortname"
+      [ assertParse shortname "abcd" "abcd"
+      , assertParse shortname "z" "z"
+      , assertParse shortname "ab-c-d" "ab-c-d"
+      , assertParseError shortname "" ["shortname"]
+      , assertParseError shortname "-ab" ["shortname"]
+      , assertParseError shortname "ab-c-" ["-"]
+      ]
+    , testGroup "hostname"
+      [ assertParse hostname "a-b" "a-b"
+      , assertParse hostname "a-b.c.d" "a-b.c.d"
+      , assertParseError hostname "" ["hostname"]
+      , assertParseError hostname "." ["hostname"]
+      , assertParseError hostname ".a" ["hostname"]
+      , assertParseError hostname "a." ["shortname"]
+      , assertParseError hostname "a..b" ["shortname"]
+      ]
+    , testGroup "ip4addr"
+      [ assertParse ip4addr "127.0.0.1" "127.0.0.1"
+      , assertParse ip4addr "8.8.8.8" "8.8.8.8"
+      , assertParseError ip4addr "1.2" []
+      , assertParseError ip4addr "127..0.0.1" []
+      ]
+    , testGroup "ip6addr"
+      [ assertParse ip6addr "2001:0db8:0000:0000:0000:ff00:0042:8329" "2001:0db8:0000:0000:0000:ff00:0042:8329"
+      , assertParse ip6addr "0:0:0:0:0:FFFF:192.0.2.128" "0:0:0:0:0:FFFF:192.0.2.128"
+      , assertParseError ip6addr "0::0:0:0:FFFF:192.0.2.128" []
+      ]
+    , testGroup "nickname"
+      [ assertParse nickname "abesto" "abesto"
+      , assertParse nickname "f1oo_bar^" "f1oo_bar^"
+      , assertParse nickname "_23456789" "_23456789"
+      , assertParseError (nickname <* endOfWord) "_234567890" []
+      ]
+    , testGroup "Prefix"
+      [ assertParse prefix "127.0.0.1" $ ServerNamePrefix "127.0.0.1"
+      , assertParse prefix "abesto" $ UserPrefix "abesto" Nothing Nothing
+      , assertParse prefix "abesto@dev" $ UserPrefix "abesto" Nothing (Just "dev")
+      , assertParse prefix "abesto!root@dev" $ UserPrefix "abesto" (Just "root") (Just "dev")
+      , assertParseError (prefix <* endOfWord) "abesto!root" []
       ]
     ]
