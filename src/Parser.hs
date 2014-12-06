@@ -1,6 +1,6 @@
 module Parser where
 
-import Text.Parsec hiding (parse, letter)
+import Text.Parsec hiding (parse, letter, space)
 import qualified Text.Parsec as P
 
 import Data.Char
@@ -11,11 +11,14 @@ import Control.Applicative ((<$>), (<*>), (<*), (*>))
 import Model.Channel
 import Model.Command
 import Model.Prefix
+import Model.Message
 
 
 type Parser st r = Parsec String st r
 
-prefix :: Parser st Prefix
+message :: Parser st Message
+message = Message <$> (optionMaybe $ char ':' *> prefix <* space) <*> command <*> params <* crlf
+
 prefix = try (UserPrefix
                  <$> nickname
                  <*> optionMaybe (char '!' *> user)
@@ -43,7 +46,7 @@ params = option [] $ times "command parameter" 0 15 nParams
           trailingAsList = (:[]) <$> trailing
 
 nospcrlfcl :: Parser st Char
-nospcrlfcl = noneOf "\NUL\CR\LF :"
+nospcrlfcl = noneOf "\NUL\r\n :"
 
 middle :: Parser st String
 middle = (:) <$> nospcrlfcl <*> many (char ':' <|> nospcrlfcl)
@@ -121,6 +124,12 @@ user = many1 $ noneOf "\NUL\CR\LF @"
 
 special :: Parser st Char
 special = oneOf (map chr $ [0x5B..0x60] ++ [0x7B..0x7D])
+
+space :: Parser st Char
+space = char ' '
+
+crlf :: Parser st String
+crlf = string "\r\n"
 
 -- Helpers not defined in the RFC
 
