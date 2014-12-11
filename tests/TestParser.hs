@@ -43,7 +43,7 @@ parserTests = testGroup "Parser"
       , assertParse params "" []
       , assertParse params "  " []
       , assertParse params " :a b c" ["a b c"]
-      , assertParse params " a b c\r\n" ["a", "b", "c"]
+      , assertParse params " a b c" ["a", "b", "c"]
       , assertParse params " ::a b c" [":a b c"]
       , assertParse params " a b :c d e" ["a", "b", "c d e"]
       , assertParse params " 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17"
@@ -100,7 +100,7 @@ parserTests = testGroup "Parser"
       , assertParseError (prefix <* endOfWord) "abesto!root" []
       ]
     , testGroup "Message"
-      [ assertParse message "JOIN #foo\r\n" $ Message Nothing Join ["#foo"]
-      , assertParse message ":abesto!root@dev 001 ohai :Oi-right geezer!\r\n" $ Message (Just $ UserPrefix "abesto" (Just "root") (Just "dev")) rpl_welcome ["ohai", "Oi-right geezer!"]
+      [ assertParse message "JOIN #foo" $ Message Nothing Join ["#foo"]
+      , assertParse message ":abesto!root@dev 001 ohai :Oi-right geezer!" $ Message (Just $ UserPrefix "abesto" (Just "root") (Just "dev")) rpl_welcome ["ohai", "Oi-right geezer!"]
       ]
     ]

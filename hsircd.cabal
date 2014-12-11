@@ -9,6 +9,7 @@ executable hsircd
   build-depends:   base
                  , parsec
                  , text
+                 , network
 
 test-suite hsircd-tests
   type:              exitcode-stdio-1.0

@@ -17,7 +17,7 @@ import Model.Message
 type Parser st r = Parsec String st r
 
 message :: Parser st Message
-message = Message <$> (optionMaybe $ char ':' *> prefix <* space) <*> command <*> params <* crlf
+message = Message <$> (optionMaybe $ char ':' *> prefix <* space) <*> command <*> params <* eof
 
 prefix = try (UserPrefix
                  <$> nickname
@@ -127,9 +127,6 @@ special = oneOf (map chr $ [0x5B..0x60] ++ [0x7B..0x7D])
 
 space :: Parser st Char
 space = char ' '
-
-crlf :: Parser st String
-crlf = string "\r\n"
 
 -- Helpers not defined in the RFC
 

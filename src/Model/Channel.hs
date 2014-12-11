@@ -15,3 +15,6 @@ data Channel = Channel {
     channelPrefix :: ChannelPrefix,
     channelName :: ChannelName
 } deriving (Eq, Show)
+
+channelToWire :: Channel -> String
+channelToWire (Channel (ChannelPrefix p) (ChannelName n)) = p:n

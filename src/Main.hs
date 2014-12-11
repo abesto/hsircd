@@ -1,9 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Model.Channel
-import Parser
+import Server
 
 main :: IO ()
-main = print "foo"
+main = run
 
