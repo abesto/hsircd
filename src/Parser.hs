@@ -34,7 +34,10 @@ command =
         (mkNumericReply <$> count 3 digit <?> "three digits") <|>
         (mkCommand . map toUpper <$> many1 letter <?> "at least one letter")
     ) <* endOfWord <?> "command"
+    -- TODO rewrite mkCommand with template haskel
     where mkCommand "JOIN" = Join
+          mkCommand "GET" = Get
+          mkCommand "SET" = Set
           mkCommand c      = UnknownCommand c
           mkNumericReply = NumericReply . read
 

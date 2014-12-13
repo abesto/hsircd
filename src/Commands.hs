@@ -1,8 +1,0 @@
-module Protocol (
-    ChannelName()
-) where
-
-
-
-
-

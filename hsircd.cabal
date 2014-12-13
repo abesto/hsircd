@@ -10,6 +10,8 @@ executable hsircd
                  , parsec
                  , text
                  , network
+                 , stm
+                 , containers
 
 test-suite hsircd-tests
   type:              exitcode-stdio-1.0
@@ -19,3 +21,4 @@ test-suite hsircd-tests
                    , HUnit
                    , tasty
                    , tasty-hunit
+

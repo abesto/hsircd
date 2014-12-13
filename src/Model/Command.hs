@@ -4,6 +4,8 @@ import Data.Char
 
 data Command = UnknownCommand String | NumericReply Int | Error
              | Join
+             -- stuff used for testing
+             | Set | Get | Value
     deriving (Show, Eq)
 
 cmdToWire :: Command -> String
