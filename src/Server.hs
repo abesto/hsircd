@@ -19,7 +19,7 @@ run :: IO ()
 run = withSocketsDo $ do
  db <- mkDatabase
  sock <- listenOn $ PortNumber 6697
- putStrLn $ "Listening on " ++ (show 6697)
+ putStrLn $ "Listening on 6697"
  sockHandler sock db
 
 sockHandler :: Socket -> TVar Database -> IO ()

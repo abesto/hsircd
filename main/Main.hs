@@ -6,4 +6,3 @@ import Database
 
 main :: IO ()
 main = run
-
