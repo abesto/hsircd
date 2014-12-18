@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
 module Main where
 
 import Network (connectTo, PortID(..))
@@ -13,8 +15,16 @@ mkClient n = do
   hSetNewlineMode h $ NewlineMode CRLF CRLF
   return $ Client n h
 
+mkClients :: [String] -> [IO Client]
+mkClients = map mkClient
+
 send :: String -> Client -> IO Client
-send s c@(Client n h) = putStrLn (n ++ " > " ++ s) >> hPutStrLn h s >> return c
+send s c@(Client n h) = putStrLn (n ++ " > " ++ s)
+                     >> hPutStrLn h s
+                     >> return c
+
+(>>!) :: IO Client -> String -> IO Client
+c >>! s = c >>= send s
 
 expect :: String -> Client -> IO Client
 expect expected c@(Client n h) = do
@@ -23,16 +33,19 @@ expect expected c@(Client n h) = do
   when (actual /= expected) $ error $ "Expected instead: " ++ expected
   return c
 
+(>>?) :: IO Client -> String -> IO Client
+c >>? s = c >>= expect s
+
 disconnect :: Client -> IO ()
 disconnect (Client n h) = putStrLn (n ++ " disconnecting") >> hClose h
 
 main :: IO ()
-main = let a = mkClient "A"
-           b = mkClient "B"
-       in a >>= send "get" >>= expect "VALUE :unset"
-       >> b >>= send "get" >>= expect "VALUE :unset"
-       >> a >>= send "set :foo bar baz" >>= expect "VALUE :foo bar baz"
-       >> a >>= send "get" >>= expect "VALUE :foo bar baz"
-       >> b >>= send "get" >>= expect "VALUE :foo bar baz"
-       >> a >>= disconnect
-       >> b >>= disconnect
+main = do
+  let [a, b] = mkClients ["A", "B"]
+  a >>! "get"              >>? "VALUE :unset"
+  b >>! "get"              >>? "VALUE :unset"
+  a >>! "set :foo bar baz" >>? "VALUE :foo bar baz"
+  a >>! "get"              >>? "VALUE :foo bar baz"
+  b >>! "get"              >>? "VALUE :foo bar baz"
+  a >>= disconnect
+  b >>= disconnect
