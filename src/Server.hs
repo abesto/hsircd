@@ -2,9 +2,11 @@ module Server where
 
 import Text.Parsec (ParseError)
 import Network (listenOn, withSocketsDo, accept, PortID(..), Socket)
-import System.IO (hSetBuffering, hSetNewlineMode, NewlineMode(..), Newline(CRLF), hGetLine, hPutStrLn, BufferMode(..), Handle)
+import System.IO (hSetBuffering, hSetNewlineMode, NewlineMode(..), Newline(CRLF), hGetLine, hPutStrLn, BufferMode(..)
+                 , Handle)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
+import Control.Monad (void)
 
 import Parser (parse, message)
 import Model.Message
@@ -19,7 +21,7 @@ run :: IO ()
 run = withSocketsDo $ do
  db <- mkDatabase
  sock <- listenOn $ PortNumber 6697
- putStrLn $ "Listening on 6697"
+ putStrLn "Listening on 6697"
  sockHandler sock db
 
 sockHandler :: Socket -> TVar Database -> IO ()
@@ -27,7 +29,7 @@ sockHandler sock db = do
     (handle, _, _) <- accept sock
     hSetBuffering handle NoBuffering
     hSetNewlineMode handle ircNewlineMode
-    forkIO $ commandProcessor handle db
+    void $ forkIO $ commandProcessor handle db
     sockHandler sock db
 
 commandProcessor :: Handle -> TVar Database -> IO ()
@@ -66,4 +68,4 @@ handleMessage  _ h (Message _ c _) = Resp id [(RTHandle h, Message Nothing err_u
 
 writeMessage :: Database -> (RespTarget, Message) -> IO ()
 writeMessage _ (RTHandle h, m) = hPutStrLn h $ messageToWire m
-writeMessage db (RTUser u, m) = undefined
+writeMessage _ (RTUser _, _) = undefined

@@ -9,25 +9,30 @@ import qualified Text.Parsec.Error as PE
 import Control.Applicative ((<*))
 
 import Parser
-import Model.Channel
 import Model.Command
 import Model.Prefix
 import Model.Message
 
+-- Can (must?) be removed once a Parsec with
+-- https://github.com/aslatter/parsec/pull/14
+-- is released
 instance Eq P.ParseError where
   (==) = (==) `on` show
 
+assertParse :: (Show a, Eq a) => P.Parsec P.SourceName () a -> TestName -> a -> TestTree
 assertParse parser input expected = testCase input $
-    (parse parser input) @?= Right expected
+    parse parser input @?= Right expected
 
+assertParseError :: Show a => P.Parsec P.SourceName () a -> TestName -> [String] -> TestTree
 assertParseError parser i ee = testCase i $
     either ((\ae -> mapM_
-                    (\e -> assertBool ("Error '" ++ e ++ "' not in " ++ (show ae)) $ elem e ae)
+                    (\e -> assertBool ("Error '" ++ e ++ "' not in " ++ show ae) $ elem e ae)
                     ee
             ) . map PE.messageString . PE.errorMessages)
            (\r -> assertFailure $ "Expected parsing to fail, got result: " ++ show r)
            (parse parser i)
 
+parserTests :: TestTree
 parserTests = testGroup "Parser"
     [ testGroup "Channel"
         [ assertParseError channelParser "#lobby\BELmuhaha" ["channel name"]

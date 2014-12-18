@@ -5,6 +5,7 @@ import Test.Tasty.HUnit
 
 import Model.Channel
 
+channelTests :: TestTree
 channelTests = testGroup "Channel"
   [ testCase "#foo{ == #fOo[" $
         Channel (ChannelPrefix '#') (ChannelName "foo{")
