@@ -12,4 +12,3 @@ commandTests = testGroup "Command"
     , testCase "RPL_USERHOST" $ cmdToWire rpl_userhost @=? "302"
     ]
   ]
-

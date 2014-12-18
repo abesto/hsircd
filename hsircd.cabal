@@ -27,6 +27,12 @@ executable hsircd
   build-depends:   base
                  , hsircd
 
+executable integration-test
+  main-is:         IntegrationTest.hs
+  hs-source-dirs:  tests
+  build-depends:   base
+                 , network
+
 test-suite hsircd-tests
   type:              exitcode-stdio-1.0
   hs-source-dirs:    tests

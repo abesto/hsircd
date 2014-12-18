@@ -32,7 +32,7 @@ sockHandler sock db = do
 
 commandProcessor :: Handle -> TVar Database -> IO ()
 commandProcessor handle db = do
-    -- TODO: if there are too many users online, just return a response and close the connection
+    -- TODO: if there are too many users online, just return a response and close the connectionommandProcessor handle db = do
     line <- hGetLine handle
     dbBefore <- readTVarIO db
     let msg = parse message line
@@ -60,6 +60,7 @@ handleMessage :: Database -> Handle -> Message -> Resp
 handleMessage  _ h (Message _ Set (v:_)) = Resp (\db -> db { dbTest = v }) $
                                                 [(RTHandle h, Message Nothing Value [v])]
 handleMessage db h (Message _ Get _) = Resp id [(RTHandle h, Message Nothing Value [dbTest db])]
+
 handleMessage  _ h (Message _ c _) = Resp id [(RTHandle h, Message Nothing err_unknowncommand [cmdToWire c, "Unknown command"])]
 
 
