@@ -13,31 +13,26 @@ mkClient n = do
   hSetNewlineMode h $ NewlineMode CRLF CRLF
   return $ Client n h
 
-send :: Client -> String -> IO ()
-send (Client n h) s = putStrLn (n ++ " > " ++ s) >> hPutStrLn h s
+send :: String -> Client -> IO Client
+send s c@(Client n h) = putStrLn (n ++ " > " ++ s) >> hPutStrLn h s >> return c
 
-expect :: Client -> String -> IO ()
-expect (Client n h) expected = do
+expect :: String -> Client -> IO Client
+expect expected c@(Client n h) = do
   actual <- hGetLine h
   putStrLn $ n ++ " < " ++ actual
   when (actual /= expected) $ error $ "Expected instead: " ++ expected
-
-t :: Client -> String -> [String] -> IO ()
-t c s es = do
-  send c s
-  mapM_ (expect c) es
+  return c
 
 disconnect :: Client -> IO ()
 disconnect (Client n h) = putStrLn (n ++ " disconnecting") >> hClose h
 
 main :: IO ()
-main = do
-  a <- mkClient "A"
-  b <- mkClient "B"
-  t a "get" ["VALUE :unset"]
-  t b "get" ["VALUE :unset"]
-  t a "set :foo bar baz" ["VALUE :foo bar baz"]
-  t a "get" ["VALUE :foo bar baz"]
-  t b "get" ["VALUE :foo bar baz"]
-  disconnect a
-  disconnect b
+main = let a = mkClient "A"
+           b = mkClient "B"
+       in a >>= send "get" >>= expect "VALUE :unset"
+       >> b >>= send "get" >>= expect "VALUE :unset"
+       >> a >>= send "set :foo bar baz" >>= expect "VALUE :foo bar baz"
+       >> a >>= send "get" >>= expect "VALUE :foo bar baz"
+       >> b >>= send "get" >>= expect "VALUE :foo bar baz"
+       >> a >>= disconnect
+       >> b >>= disconnect
