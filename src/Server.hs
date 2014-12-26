@@ -42,30 +42,38 @@ commandProcessor handle db = do
     atomically $ do
         pureDb <- readTVar db
         writeTVar db $ dbTransaction pureDb
-    mapM_ (writeMessage dbBefore) msgs
+    mapM_ (writeMessage dbBefore handle) msgs
     commandProcessor handle db
 
 data RespTarget = RTUser User
+                | RTDirect
                 | RTHandle Handle
              -- | RTChannel Channel
+type Replies = [(RespTarget, Message)]
+data Resp = Resp Transaction Replies
 
-data Resp = Resp Transaction [(RespTarget, Message)]
+directT :: Transaction -> [Message] -> Resp
+directT t ms = Resp t [(RTDirect, m) | m <- ms]
+
+direct :: [Message] -> Resp
+direct = directT id
 
 handleEitherMessage :: Database -> Handle -> Either ParseError Message -> Resp
-handleEitherMessage db h (Right m) = handleMessage db h m
+handleEitherMessage db h (Right m) = handleMessage m db h
 handleEitherMessage  _ h (Left e) = Resp id [(RTHandle h, msg)]
     where details = map (\c -> if c == '\n' then ' ' else c) $ show e
           msgString = "Failed to parse your message. Details: " ++ details
           msg = Message Nothing Error [msgString]
 
-handleMessage :: Database -> Handle -> Message -> Resp
-handleMessage  _ h (Message _ Set (v:_)) = Resp (\db -> db { dbTest = v }) $
-                                                [(RTHandle h, Message Nothing Value [v])]
-handleMessage db h (Message _ Get _) = Resp id [(RTHandle h, Message Nothing Value [dbTest db])]
+handleMessage ::  Message -> Database -> Handle -> Resp
+handleMessage (Message prefix cmd params) db h
+  | cmd == Set  = directT (\db' -> db' { dbTest = p }) [Message Nothing Value [p]]
+  | cmd == Get  = direct [Message Nothing Value [dbTest db]]
+  | otherwise   = direct [Message Nothing err_unknowncommand [cmdToWire cmd, "Unknown command"]]
+  where p       = head params
 
-handleMessage  _ h (Message _ c _) = Resp id [(RTHandle h, Message Nothing err_unknowncommand [cmdToWire c, "Unknown command"])]
 
-
-writeMessage :: Database -> (RespTarget, Message) -> IO ()
-writeMessage _ (RTHandle h, m) = hPutStrLn h $ messageToWire m
-writeMessage _ (RTUser _, _) = undefined
+writeMessage :: Database -> Handle -> (RespTarget, Message) -> IO ()
+writeMessage _ _ (RTHandle h, m) = hPutStrLn h $ messageToWire m
+writeMessage _ sender (RTDirect, m) = hPutStrLn sender $ messageToWire m
+writeMessage _ _ (RTUser _, _) = undefined
