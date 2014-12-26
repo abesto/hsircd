@@ -3,7 +3,7 @@ module Model.Command where
 import Data.Char
 
 data Command = UnknownCommand String | NumericReply Int | Error
-             | Join
+             | Join | Nick
              -- stuff used for testing
              | Set | Get | Value
     deriving (Show, Eq)
@@ -21,3 +21,9 @@ rpl_userhost = NumericReply 302
 
 err_unknowncommand :: Command
 err_unknowncommand = NumericReply 421
+
+err_nonicknamegiven :: Command
+err_nonicknamegiven = NumericReply 431
+
+err_nicknameinuse :: Command
+err_nicknameinuse = NumericReply 433

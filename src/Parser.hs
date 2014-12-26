@@ -40,6 +40,7 @@ command =
     where mkCommand "JOIN" = Join
           mkCommand "GET" = Get
           mkCommand "SET" = Set
+          mkCommand "NICK" = Nick
           mkCommand c      = UnknownCommand c
           mkNumericReply = NumericReply . read
 

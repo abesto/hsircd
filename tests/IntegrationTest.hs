@@ -47,16 +47,6 @@ data Test = Test { name   :: String
                  , log    :: [String]
                  }
 
-mkTest :: String -> IO () -> Test
-mkTest n a = Test n a []
-
-runTest :: Test -> IO Int
-runTest (Test n t l) = do
-  putStrLn $ "Test " ++ n ++ ": RUNNING..."
-  try t >>= either printFail printPass
-  where printFail e = putStr (unlines $ l ++ [ioeGetErrorString e, "Test " ++ n ++ ": FAIL"]) >> return 1
-        printPass _ = putStrLn ("Test " ++ n ++ ": PASS") >> return 0
-
 withClient :: String -> (IO Client -> IO a) -> IO ()
 withClient n f = let c = mkClient n in f c >> c >>= disconnect
 
@@ -65,21 +55,44 @@ with2Clients n1 n2 f = let c1 = mkClient n1
                            c2 = mkClient n2
                        in f c1 c2 >> c1 >>= disconnect >> c2 >>= disconnect
 
+mkTest :: String -> (IO Client -> IO a) -> Test
+mkTest n f = Test n (withClient "A" f) []
+
+mkTest2 :: String -> (IO Client -> IO Client -> IO a) -> Test
+mkTest2 n f = Test n (with2Clients "A" "B" f) []
+
+runTest :: Test -> IO Int
+runTest (Test n t l) = do
+  putStrLn $ "Test " ++ n ++ ": RUNNING..."
+  try t >>= either printFail printPass
+  where printFail e = putStr (unlines $ l ++ [ioeGetErrorString e, "Test " ++ n ++ ": FAIL"]) >> return 1
+        printPass _ = putStrLn ("Test " ++ n ++ ": PASS") >> return 0
+
 unknownCommand :: Test
-unknownCommand = mkTest "Unknown command FOO" $ withClient "A"
-                 (\a -> a >>! "Foo" >>? "421 FOO :Unknown command")
+unknownCommand = mkTest "Unknown command FOO" (\a -> a >>! "Foo" >>? "421 FOO :Unknown command")
+
+nick :: [Test]
+nick = [ mkTest "NICK without nick name" (\a -> a >>! "nick" >>? "431 :No nickname given")
+       , mkTest2 "NICK to already existing nickname" (\a b -> do
+                                                         a >>! "nick root"
+                                                         b >>! "nick root" >>? "433 root :Nickname is already in use"
+                                                     )
+       ]
 
 setter :: Test
-setter = mkTest "GET and SET" $ with2Clients "A" "B" (\a b -> do
+setter = mkTest2 "GET and SET" (\a b -> do
   a >>! "get"              >>? "VALUE :unset"
   b >>! "get"              >>? "VALUE :unset"
   a >>! "set :foo bar baz" >>? "VALUE :foo bar baz"
   a >>! "get"              >>? "VALUE :foo bar baz"
   b >>! "get"              >>? "VALUE :foo bar baz")
 
+tests :: [Test]
+tests = [setter, unknownCommand] ++ nick
+
 main :: IO ()
 main = do
-  code <- liftM maximum $ mapM runTest [setter, unknownCommand]
+  code <- liftM maximum $ mapM runTest tests
   exitWith $ if code > 0
                   then ExitFailure code
                   else ExitSuccess

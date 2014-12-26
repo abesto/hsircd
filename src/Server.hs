@@ -36,12 +36,12 @@ commandProcessor :: Handle -> TVar Database -> IO ()
 commandProcessor handle db = do
     -- TODO: if there are too many users online, just return a response and close the connectionommandProcessor handle db = do
     line <- hGetLine handle
-    dbBefore <- readTVarIO db
     let msg = parse message line
-        (Resp dbTransaction msgs) = handleEitherMessage dbBefore handle msg
-    atomically $ do
-        pureDb <- readTVar db
-        writeTVar db $ dbTransaction pureDb
+    (dbBefore, msgs) <- atomically $ do
+      dbBefore <- readTVar db
+      let (Resp dbTransaction msgs) = handleEitherMessage dbBefore handle msg
+      writeTVar db $ dbTransaction dbBefore
+      return (dbBefore, msgs)
     mapM_ (writeMessage dbBefore handle) msgs
     commandProcessor handle db
 
@@ -58,6 +58,12 @@ directT t ms = Resp t [(RTDirect, m) | m <- ms]
 direct :: [Message] -> Resp
 direct = directT id
 
+noResp :: Resp
+noResp = Resp id []
+
+noRespT :: Transaction -> Resp
+noRespT t = Resp t []
+
 handleEitherMessage :: Database -> Handle -> Either ParseError Message -> Resp
 handleEitherMessage db h (Right m) = handleMessage m db h
 handleEitherMessage  _ h (Left e) = Resp id [(RTHandle h, msg)]
@@ -69,8 +75,13 @@ handleMessage ::  Message -> Database -> Handle -> Resp
 handleMessage (Message prefix cmd params) db h
   | cmd == Set  = directT (\db' -> db' { dbTest = p }) [Message Nothing Value [p]]
   | cmd == Get  = direct [Message Nothing Value [dbTest db]]
+  | cmd == Nick = nick params
   | otherwise   = direct [Message Nothing err_unknowncommand [cmdToWire cmd, "Unknown command"]]
-  where p       = head params
+  where p = head params
+        nick [] = direct [Message Nothing err_nonicknamegiven ["No nickname given"]]
+        nick (n:_)
+          | isNicknameInUse db n = direct [Message Nothing err_nicknameinuse [n, "Nickname is already in use"]]
+          | otherwise            = noRespT (saveNick n h)
 
 
 writeMessage :: Database -> Handle -> (RespTarget, Message) -> IO ()
