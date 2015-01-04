@@ -22,7 +22,7 @@ insertUserByNickname n u h = Map.insert n (UserData u h)
 data UserDataStore = UserDataStore { byNickname :: Map Nickname UserData }
 
 insertUser :: UserDataStore -> User -> Handle -> UserDataStore
-insertUser _ (UserOnlyUser _ _ _ _ _) _ = error "Tried to insert a UserOnlyUser into a UserDataStore"
+insertUser _ (UserOnlyUser _ _ _ _) _ = error "Tried to insert a UserOnlyUser into a UserDataStore"
 insertUser s u@(NicknameOnlyUser n)   h = s { byNickname = insertUserByNickname n u h $ byNickname s}
 insertUser s u h                        = s { byNickname = insertUserByNickname (uNickname u) u h $ byNickname s }
 

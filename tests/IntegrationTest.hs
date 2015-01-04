@@ -72,17 +72,67 @@ unknownCommand :: Test
 unknownCommand = mkTest "Unknown command FOO" (\a -> a >>! "Foo" >>? "421 FOO :Unknown command")
 
 nick :: [Test]
-nick = [ mkTest "NICK without nick name" (\a -> a >>! "nick" >>? "431 :No nickname given")
-       , mkTest2 "NICK to already existing nickname" (\a b -> do
-                                                         a >>! "nick root"
-                                                         b >>! "nick root" >>? "433 root :Nickname is already in use"
-                                                     )
-       , mkTest2 "NICK change before USER" (\a b -> do
-                                               a >>! "nick x" >>! "nick a" >>? "NICK :a"
-                                               b >>! "nick x" >>! "nick b" >>? "NICK :b"
-                                               a >>! "nick b" >>? "433 b :Nickname is already in use"
-                                               b >>! "nick a" >>? "433 a :Nickname is already in use"
-                                           )
+nick = [ mkTest "NICK without nick name"
+         (\a -> a >>! "nick" >>? "431 :No nickname given")
+       , mkTest2 "NICK to already existing nickname"
+         (\a b -> do
+             a >>! "nick root"
+             b >>! "nick root" >>? "433 root :Nickname is already in use"
+         )
+       , mkTest2 "NICK change before USER"
+         (\a b -> do
+             a >>! "nick x" >>! "nick a" >>? "NICK :a"
+             b >>! "nick x" >>! "nick b" >>? "NICK :b"
+             a >>! "nick b" >>? "433 b :Nickname is already in use"
+             b >>! "nick a" >>? "433 a :Nickname is already in use"
+         )
+       , mkTest "NICK after USER"
+         (\a -> a
+                >>! "user nickTestUsername1 0 * :Nick Name" >>! "nick nickTest1"
+                >>? "001 :Welcome to the Internet Relay Network nickTest1!nickTestUsername1@Host lookup not implemented"
+                >>? "002 :Your host is $SERVERNAME running an experimental server"
+                >>? "003 :This server was created $CREATEDAT"
+                                  )
+       , mkTest2 "USER then NICK then NICK. First nick freed, second nick taken."
+         (\a b -> do
+             a >>! "user nickTestUsername2 0 * :Nick Name" >>! "nick nickTest2"
+               >>? "001 :Welcome to the Internet Relay Network nickTest2!nickTestUsername2@Host lookup not implemented"
+               >>? "002 :Your host is $SERVERNAME running an experimental server"
+               >>? "003 :This server was created $CREATEDAT"
+               >>! "nick nickTest2.1" >>? "NICK :nickTest2.1"
+             b >>! "nick nickTest2.1" >>? "433 nickTest2.1 :Nickname is already in use"
+               >>! "nick nickTest2" >>! "nick nickTest2.2" >>? "NICK :nickTest2.2"
+         )
+       ]
+
+user :: [Test]
+user = [ mkTest "USER with not enough parameters"
+         (\a -> a >>! "user foo 0 *" >>? "461 USER :Not enough parameters")
+       , mkTest "NICK then USER"
+         (\a -> a
+                >>! "nick blian" >>! "user brian 0 * :Graham Chapman"
+                >>? "001 :Welcome to the Internet Relay Network blian!brian@Host lookup not implemented"
+                >>? "002 :Your host is $SERVERNAME running an experimental server"
+                >>? "003 :This server was created $CREATEDAT"
+         )
+       , mkTest "USER then USER then NICK"
+         (\a -> a
+                >>! "user brian2 0 * :Graham Chapman"
+                >>! "user brian2.1 0 * :Graham Chapman" >>? "462 :Unauthorized command (already registered)"
+                >>! "nick blian2"
+                >>? "001 :Welcome to the Internet Relay Network blian2!brian2@Host lookup not implemented"
+                >>? "002 :Your host is $SERVERNAME running an experimental server"
+                >>? "003 :This server was created $CREATEDAT"
+         )
+       , mkTest "NICK then USER then USER"
+         (\a -> a
+                >>! "nick blian3"
+                >>! "user brian3 0 * :Graham Chapman"
+                >>? "001 :Welcome to the Internet Relay Network blian3!brian3@Host lookup not implemented"
+                >>? "002 :Your host is $SERVERNAME running an experimental server"
+                >>? "003 :This server was created $CREATEDAT"
+                >>! "user brian3.1 0 * :Graham Chapman" >>? "462 :Unauthorized command (already registered)"
+         )
        ]
 
 setter :: Test
@@ -94,7 +144,7 @@ setter = mkTest2 "GET and SET" (\a b -> do
   b >>! "get"              >>? "VALUE :foo bar baz")
 
 tests :: [Test]
-tests = [setter, unknownCommand] ++ nick
+tests = [setter, unknownCommand] ++ nick ++ user
 
 main :: IO ()
 main = do
