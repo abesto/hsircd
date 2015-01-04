@@ -12,6 +12,7 @@ library
                  , network
                  , stm
                  , containers
+                 , syb
   exposed-modules: Database
                  , Model.Channel
                  , Model.Command

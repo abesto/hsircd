@@ -6,6 +6,8 @@ import qualified Text.Parsec as P
 import Data.Char
 import Data.List (intercalate)
 import Data.Maybe (isJust, isNothing)
+import Data.Data(fromConstr, readConstr, dataTypeOf)
+
 import Control.Applicative ((<$>), (<*>), (<*), (*>))
 import Control.Monad (void)
 
@@ -36,13 +38,12 @@ command =
         (mkNumericReply <$> count 3 digit <?> "three digits") <|>
         (mkCommand . map toUpper <$> many1 letter <?> "at least one letter")
     ) <* endOfWord <?> "command"
-    -- TODO rewrite mkCommand with template haskel
-    where mkCommand "JOIN" = Join
-          mkCommand "GET" = Get
-          mkCommand "SET" = Set
-          mkCommand "NICK" = Nick
-          mkCommand c      = UnknownCommand c
-          mkNumericReply = NumericReply . read
+        where mkCommand c = cmd
+                where cmd = maybe (UnknownCommand c) fromConstr $ readConstr cmdT (capitalize c)
+                      cmdT = dataTypeOf cmd
+                      capitalize (x:xs) = toUpper x : map toLower xs
+                      capitalize x = map toUpper x
+              mkNumericReply = NumericReply . read
 
 params :: Parser st [String]
 params = option [] $ times "command parameter" 0 15 nParams
