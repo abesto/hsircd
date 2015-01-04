@@ -8,13 +8,27 @@ import Data.Maybe
 
 import Model.User
 
-type Nick = String
-
-data UserData = UserData { udNick :: Nick
+data UserData = UserData { udUser :: User
                          , udHandle :: Handle
                          -- , udHandleLock :: Lock
                          }
-type UserDataStore = Map Nick UserData
+
+mkUserData :: Handle -> UserData
+mkUserData = UserData UnregisteredUser
+
+insertUserByNickname :: Nickname -> User -> Handle -> Map Nickname UserData -> Map Nickname UserData
+insertUserByNickname n u h = Map.insert n (UserData u h)
+
+data UserDataStore = UserDataStore { byNickname :: Map Nickname UserData }
+
+insertUser :: UserDataStore -> User -> Handle -> UserDataStore
+insertUser _ (UserOnlyUser _ _ _ _ _) _ = error "Tried to insert a UserOnlyUser into a UserDataStore"
+insertUser s u@(NicknameOnlyUser n)   h = s { byNickname = insertUserByNickname n u h $ byNickname s}
+insertUser s u h                        = s { byNickname = insertUserByNickname (uNickname u) u h $ byNickname s }
+
+deleteUser :: UserDataStore -> Nickname -> UserDataStore
+deleteUser s n = s { byNickname = Map.delete n $ byNickname s }
+
 type TestData = String
 
 data Database = Database { dbUserData :: UserDataStore
@@ -23,13 +37,18 @@ data Database = Database { dbUserData :: UserDataStore
 type Transaction = Database -> Database
 
 mkDatabase :: IO (TVar Database)
-mkDatabase = newTVarIO $ Database Map.empty "unset"
+mkDatabase = newTVarIO $ Database { dbUserData = UserDataStore Map.empty
+                                  , dbTest = "unset"
+                                  }
 
 handleToUser :: Database -> Handle -> Maybe User
-handleToUser (Database s _) h = listToMaybe $ Map.keys $ Map.filter ((== h) . udHandle) s
+handleToUser db h = fmap udUser $ listToMaybe $ Map.elems $ Map.filter ((== h) . udHandle) (byNickname $ dbUserData db)
 
-isNicknameInUse :: Database -> Nick -> Bool
-isNicknameInUse db n = Map.member n $ dbUserData db
+isNicknameInUse :: Database -> Nickname -> Bool
+isNicknameInUse db n = Map.member n $ byNickname $ dbUserData db
 
-saveNick :: Nick -> Handle -> Database -> Database
-saveNick n h db@(Database ud _) = db { dbUserData = Map.insert n (UserData n h) ud}
+saveUser :: User -> Handle -> Database -> Database
+saveUser u h db@(Database ud _) = db { dbUserData = insertUser ud u h }
+
+freeNickname :: Nickname -> Database -> Database
+freeNickname n db = db { dbUserData = deleteUser (dbUserData db) n }

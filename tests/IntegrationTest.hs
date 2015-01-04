@@ -77,6 +77,12 @@ nick = [ mkTest "NICK without nick name" (\a -> a >>! "nick" >>? "431 :No nickna
                                                          a >>! "nick root"
                                                          b >>! "nick root" >>? "433 root :Nickname is already in use"
                                                      )
+       , mkTest2 "NICK change before USER" (\a b -> do
+                                               a >>! "nick x" >>! "nick a" >>? "NICK :a"
+                                               b >>! "nick x" >>! "nick b" >>? "NICK :b"
+                                               a >>! "nick b" >>? "433 b :Nickname is already in use"
+                                               b >>! "nick a" >>? "433 a :Nickname is already in use"
+                                           )
        ]
 
 setter :: Test
