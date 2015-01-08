@@ -8,7 +8,7 @@ type Nickname = String
 data UserFlags = UserFlags { ufWallops :: Bool
                            , ufInvisible :: Bool
                            }
-                 deriving (Data, Typeable)
+                 deriving (Data, Typeable, Show, Eq)
 
 mkUserFlags :: String -> UserFlags
 mkUserFlags s = UserFlags { ufWallops = isSet 2
@@ -31,7 +31,7 @@ data User = UnregisteredUser
                      , uHost :: String
                      , uFlags :: UserFlags
                      }
-            deriving (Data, Typeable)
+            deriving (Data, Typeable, Eq)
 
 -- TODO move `error`s to the type system
 
@@ -53,11 +53,11 @@ changeNickname n (NicknameOnlyUser _) = NicknameOnlyUser n
 changeNickname n (UserOnlyUser u r h f) = FullUser n u r h f
 changeNickname n u@(FullUser _ _ _ _ _ ) = u { uNickname = n }
 
-addUserData :: User -> String -> String -> String -> User
+addUserData :: User -> String -> UserFlags -> String -> User
 addUserData UnregisteredUser username mode realname = UserOnlyUser { uuUsername = username
                                                                    , uuRealname = realname
                                                                    , uuHost = "Host lookup not implemented"
-                                                                   , uuFlags = mkUserFlags mode
+                                                                   , uuFlags = mode
                                                                    }
 addUserData (NicknameOnlyUser nick) username mode realname = changeNickname nick $ addUserData UnregisteredUser username mode realname
 addUserData u _ _ _ = unsupportedUser "Tried to call addUserData on a " u

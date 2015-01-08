@@ -9,7 +9,6 @@ commandTests :: TestTree
 commandTests = testGroup "Command"
   [ testGroup "cmdToWire"
     [ testCase "Join" $ cmdToWire Join @=? "JOIN"
-    , testCase "RPL_WELCOME"  $ cmdToWire rpl_welcome @=? "001"
-    , testCase "RPL_USERHOST" $ cmdToWire rpl_userhost @=? "302"
+    , testCase "RPL_WELCOME"  $ cmdToWire (NumericReply 001) @=? "001"
     ]
   ]

@@ -19,8 +19,8 @@ import Model.Message
 
 type Parser st r = Parsec String st r
 
-message :: Parser st Message
-message = Message <$> optionMaybe (char ':' *> prefix <* space) <*> command <*> params <* eof
+message :: Parser st RawMessage
+message = RawMessage <$> optionMaybe (char ':' *> prefix <* space) <*> command <*> params <* eof
 
 prefix :: Parser st Prefix
 prefix = try (UserPrefix

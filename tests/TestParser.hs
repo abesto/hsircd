@@ -59,7 +59,6 @@ parserTests = testGroup "Parser"
       , assertParse command "join" Join
       , assertParse command "JoIn" Join
       , assertParse command "WhatDoesTheFoxSay" $ UnknownCommand "WHATDOESTHEFOXSAY"
-      , assertParse command "001" rpl_welcome
       , assertParseError command "" ["", "command"]
       , assertParseError command "0123" ["'3'", "end of word"]
       ]
@@ -105,7 +104,6 @@ parserTests = testGroup "Parser"
       , assertParseError (prefix <* endOfWord) "abesto!root" []
       ]
     , testGroup "Message"
-      [ assertParse message "JOIN #foo" $ Message Nothing Join ["#foo"]
-      , assertParse message ":abesto!root@dev 001 ohai :Oi-right geezer!" $ Message (Just $ UserPrefix "abesto" (Just "root") (Just "dev")) rpl_welcome ["ohai", "Oi-right geezer!"]
+      [ assertParse message ":boo NICK foo :bar baz" $ RawMessage (Just $ UserPrefix "boo" Nothing Nothing) Nick ["foo", "bar baz"]
       ]
     ]

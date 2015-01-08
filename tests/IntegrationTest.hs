@@ -90,15 +90,15 @@ nick = [ mkTest "NICK without nick name"
          (\a -> a
                 >>! "user nickTestUsername1 0 * :Nick Name" >>! "nick nickTest1"
                 >>? "001 :Welcome to the Internet Relay Network nickTest1!nickTestUsername1@Host lookup not implemented"
-                >>? "002 :Your host is $SERVERNAME running an experimental server"
-                >>? "003 :This server was created $CREATEDAT"
+                >>? "002 :Your host is $SERVERNAME, running version $VERSION"
+                >>? "003 :This server was created 0"
                                   )
        , mkTest2 "USER then NICK then NICK. First nick freed, second nick taken."
          (\a b -> do
              a >>! "user nickTestUsername2 0 * :Nick Name" >>! "nick nickTest2"
                >>? "001 :Welcome to the Internet Relay Network nickTest2!nickTestUsername2@Host lookup not implemented"
-               >>? "002 :Your host is $SERVERNAME running an experimental server"
-               >>? "003 :This server was created $CREATEDAT"
+               >>? "002 :Your host is $SERVERNAME, running version $VERSION"
+               >>? "003 :This server was created 0"
                >>! "nick nickTest2.1" >>? "NICK :nickTest2.1"
              b >>! "nick nickTest2.1" >>? "433 nickTest2.1 :Nickname is already in use"
                >>! "nick nickTest2" >>! "nick nickTest2.2" >>? "NICK :nickTest2.2"
@@ -112,8 +112,8 @@ user = [ mkTest "USER with not enough parameters"
          (\a -> a
                 >>! "nick blian" >>! "user brian 0 * :Graham Chapman"
                 >>? "001 :Welcome to the Internet Relay Network blian!brian@Host lookup not implemented"
-                >>? "002 :Your host is $SERVERNAME running an experimental server"
-                >>? "003 :This server was created $CREATEDAT"
+                >>? "002 :Your host is $SERVERNAME, running version $VERSION"
+                >>? "003 :This server was created 0"
          )
        , mkTest "USER then USER then NICK"
          (\a -> a
@@ -121,16 +121,16 @@ user = [ mkTest "USER with not enough parameters"
                 >>! "user brian2.1 0 * :Graham Chapman" >>? "462 :Unauthorized command (already registered)"
                 >>! "nick blian2"
                 >>? "001 :Welcome to the Internet Relay Network blian2!brian2@Host lookup not implemented"
-                >>? "002 :Your host is $SERVERNAME running an experimental server"
-                >>? "003 :This server was created $CREATEDAT"
+                >>? "002 :Your host is $SERVERNAME, running version $VERSION"
+                >>? "003 :This server was created 0"
          )
        , mkTest "NICK then USER then USER"
          (\a -> a
                 >>! "nick blian3"
                 >>! "user brian3 0 * :Graham Chapman"
                 >>? "001 :Welcome to the Internet Relay Network blian3!brian3@Host lookup not implemented"
-                >>? "002 :Your host is $SERVERNAME running an experimental server"
-                >>? "003 :This server was created $CREATEDAT"
+                >>? "002 :Your host is $SERVERNAME, running version $VERSION"
+                >>? "003 :This server was created 0"
                 >>! "user brian3.1 0 * :Graham Chapman" >>? "462 :Unauthorized command (already registered)"
          )
        ]
