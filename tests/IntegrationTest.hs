@@ -3,11 +3,12 @@
 module Main where
 
 import Network (connectTo, PortID(..))
-import System.IO (hSetBuffering, hSetNewlineMode, NewlineMode(..), Newline(CRLF), hGetLine, hPutStrLn, BufferMode(..), Handle, hClose)
+import System.IO (hSetBuffering, hSetNewlineMode, NewlineMode(..), Newline(CRLF), hGetLine, hPutStrLn, BufferMode(..), Handle, hClose, hWaitForInput)
 import System.IO.Error (ioeGetErrorString)
 import System.Exit (exitWith, ExitCode(..))
 import Control.Monad (when, liftM)
 import Control.Exception (try)
+import Control.Concurrent.ParallelIO.Global (parallel)
 
 data Client = Client String Handle
 
@@ -36,8 +37,21 @@ expect expected c@(Client n h) = do
   when (actual /= expected) $ fail $ "Expected instead: " ++ expected
   return c
 
+expectNothing :: Client -> IO Client
+expectNothing c@(Client n h) = do
+  isReady <- hWaitForInput h 500
+  when isReady $ do
+    line <- hGetLine h
+    fail $ n ++ " expected no data from server, but got: " ++ line
+  return c
+
+nothing :: String
+nothing = "__NOTHING__"
+
 (>>?) :: IO Client -> String -> IO Client
-c >>? s = c >>= expect s
+c >>? s
+  | s == nothing = c >>= expectNothing
+  | otherwise    = c >>= expect s
 
 disconnect :: Client -> IO ()
 disconnect (Client n h) = putStrLn (n ++ " disconnecting") >> hClose h
@@ -76,26 +90,26 @@ nick = [ mkTest "NICK without nick name"
          (\a -> a >>! "nick" >>? "431 :No nickname given")
        , mkTest2 "NICK to already existing nickname"
          (\a b -> do
-             a >>! "nick root"
+             a >>! "nick root" >>? nothing
              b >>! "nick root" >>? "433 root :Nickname is already in use"
          )
        , mkTest2 "NICK change before USER"
          (\a b -> do
-             a >>! "nick x" >>! "nick a" >>? "NICK :a"
-             b >>! "nick x" >>! "nick b" >>? "NICK :b"
+             a >>! "nick x" >>? nothing >>! "nick a" >>? "NICK :a"
+             b >>! "nick x" >>? nothing >>! "nick b" >>? "NICK :b"
              a >>! "nick b" >>? "433 b :Nickname is already in use"
              b >>! "nick a" >>? "433 a :Nickname is already in use"
          )
        , mkTest "NICK after USER"
          (\a -> a
-                >>! "user nickTestUsername1 0 * :Nick Name" >>! "nick nickTest1"
+                >>! "user nickTestUsername1 0 * :Nick Name" >>? nothing >>! "nick nickTest1"
                 >>? "001 :Welcome to the Internet Relay Network nickTest1!nickTestUsername1@Host lookup not implemented"
                 >>? "002 :Your host is $SERVERNAME, running version $VERSION"
                 >>? "003 :This server was created 0"
                                   )
        , mkTest2 "USER then NICK then NICK. First nick freed, second nick taken."
          (\a b -> do
-             a >>! "user nickTestUsername2 0 * :Nick Name" >>! "nick nickTest2"
+             a >>! "user nickTestUsername2 0 * :Nick Name" >>? nothing >>! "nick nickTest2"
                >>? "001 :Welcome to the Internet Relay Network nickTest2!nickTestUsername2@Host lookup not implemented"
                >>? "002 :Your host is $SERVERNAME, running version $VERSION"
                >>? "003 :This server was created 0"
@@ -110,14 +124,14 @@ user = [ mkTest "USER with not enough parameters"
          (\a -> a >>! "user foo 0 *" >>? "461 USER :Not enough parameters")
        , mkTest "NICK then USER"
          (\a -> a
-                >>! "nick blian" >>! "user brian 0 * :Graham Chapman"
+                >>! "nick blian" >>? nothing >>! "user brian 0 * :Graham Chapman"
                 >>? "001 :Welcome to the Internet Relay Network blian!brian@Host lookup not implemented"
                 >>? "002 :Your host is $SERVERNAME, running version $VERSION"
                 >>? "003 :This server was created 0"
          )
        , mkTest "USER then USER then NICK"
          (\a -> a
-                >>! "user brian2 0 * :Graham Chapman"
+                >>! "user brian2 0 * :Graham Chapman" >>? nothing
                 >>! "user brian2.1 0 * :Graham Chapman" >>? "462 :Unauthorized command (already registered)"
                 >>! "nick blian2"
                 >>? "001 :Welcome to the Internet Relay Network blian2!brian2@Host lookup not implemented"
@@ -126,7 +140,7 @@ user = [ mkTest "USER with not enough parameters"
          )
        , mkTest "NICK then USER then USER"
          (\a -> a
-                >>! "nick blian3"
+                >>! "nick blian3" >>? nothing
                 >>! "user brian3 0 * :Graham Chapman"
                 >>? "001 :Welcome to the Internet Relay Network blian3!brian3@Host lookup not implemented"
                 >>? "002 :Your host is $SERVERNAME, running version $VERSION"
@@ -148,7 +162,7 @@ tests = [setter, unknownCommand] ++ nick ++ user
 
 main :: IO ()
 main = do
-  code <- liftM maximum $ mapM runTest tests
+  code <- liftM maximum $ parallel $ map runTest tests
   exitWith $ if code > 0
                   then ExitFailure code
                   else ExitSuccess

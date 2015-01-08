@@ -25,17 +25,19 @@ library
 
 executable hsircd
   main-is:         Main.hs
-  ghc-options:     -Wall
+  ghc-options:     -Wall -threaded
   hs-source-dirs:  main
   build-depends:   base
                  , hsircd
 
 executable integration-test
   main-is:         IntegrationTest.hs
-  ghc-options:     -Wall
+  ghc-options:     -Wall -threaded -rtsopts
   hs-source-dirs:  tests
   build-depends:   base
                  , network
+                 , parallel-io
+
 
 test-suite hsircd-tests
   type:              exitcode-stdio-1.0
