@@ -7,7 +7,7 @@ import Data.Data
 -- TODO: add parameters to command arguments
 
 data Command = UnknownCommand String | NumericReply Int | Error
-             | Join | Nick | User
+             | Join | Nick | User | Privmsg
              -- stuff used for testing
              | Set | Get | Value
     deriving (Show, Eq, Data, Typeable)

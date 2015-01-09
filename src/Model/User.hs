@@ -56,7 +56,7 @@ changeNickname n u@(FullUser _ _ _ _ _ ) = u { uNickname = n }
 addUserData :: User -> String -> UserFlags -> String -> User
 addUserData UnregisteredUser username mode realname = UserOnlyUser { uuUsername = username
                                                                    , uuRealname = realname
-                                                                   , uuHost = "Host lookup not implemented"
+                                                                   , uuHost = "$USERHOST"
                                                                    , uuFlags = mode
                                                                    }
 addUserData (NicknameOnlyUser nick) username mode realname = changeNickname nick $ addUserData UnregisteredUser username mode realname

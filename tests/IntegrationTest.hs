@@ -6,7 +6,7 @@ import Network (connectTo, PortID(..))
 import System.IO (hSetBuffering, hSetNewlineMode, NewlineMode(..), Newline(CRLF), hGetLine, hPutStrLn, BufferMode(..), Handle, hClose, hWaitForInput)
 import System.IO.Error (ioeGetErrorString)
 import System.Exit (exitWith, ExitCode(..))
-import Control.Monad (when, liftM)
+import Control.Monad (when, liftM, foldM)
 import Control.Exception (try)
 import Control.Concurrent.ParallelIO.Global (parallel)
 
@@ -27,6 +27,7 @@ send s c@(Client n h) = putStrLn (n ++ " > " ++ s)
                      >> hPutStrLn h s
                      >> return c
 
+infixl 1 >>!
 (>>!) :: IO Client -> String -> IO Client
 c >>! s = c >>= send s
 
@@ -48,10 +49,25 @@ expectNothing c@(Client n h) = do
 nothing :: String
 nothing = "__NOTHING__"
 
+infixl 1 >>?
 (>>?) :: IO Client -> String -> IO Client
 c >>? s
   | s == nothing = c >>= expectNothing
   | otherwise    = c >>= expect s
+
+(>>??) :: IO Client -> [String] -> IO Client
+c >>?? ss = c >>= (\pc -> foldM (flip expect) pc ss)
+
+register' :: String -> String -> String -> String -> IO Client -> IO Client
+register' n u m r c = c
+                >>! "nick " ++ n
+                >>! "user " ++ u ++ " " ++ m ++ " * :" ++ r
+                >>? "001 :Welcome to the Internet Relay Network " ++ n ++ "!" ++ u ++ "@$USERHOST"
+                >>? "002 :Your host is $SERVERNAME, running version $VERSION"
+                >>? "003 :This server was created 0"
+
+register :: String -> IO Client -> IO Client
+register n = register' n n "0" n
 
 disconnect :: Client -> IO ()
 disconnect (Client n h) = putStrLn (n ++ " disconnecting") >> hClose h
@@ -75,6 +91,13 @@ mkTest n f = Test n (withClient "A" f) []
 mkTest2 :: String -> (IO Client -> IO Client -> IO a) -> Test
 mkTest2 n f = Test n (with2Clients "A" "B" f) []
 
+mkTestRegistered2 :: String -> String -> String -> (IO Client -> IO Client -> IO a) -> Test
+mkTestRegistered2 n na nb f = mkTest2 n f'
+  where f' a b = do
+          a' <- register na a
+          b' <- register nb b
+          f (return a') (return b')
+
 runTest :: Test -> IO Int
 runTest (Test n t l) = do
   putStrLn $ "Test " ++ n ++ ": RUNNING..."
@@ -95,27 +118,27 @@ nick = [ mkTest "NICK without nick name"
          )
        , mkTest2 "NICK change before USER"
          (\a b -> do
-             a >>! "nick x" >>? nothing >>! "nick a" >>? "NICK :a"
-             b >>! "nick x" >>? nothing >>! "nick b" >>? "NICK :b"
+             a >>! "nick x" >>? nothing >>! "nick a" >>? ":x NICK :a"
+             b >>! "nick x" >>? nothing >>! "nick b" >>? ":x NICK :b"
              a >>! "nick b" >>? "433 b :Nickname is already in use"
              b >>! "nick a" >>? "433 a :Nickname is already in use"
          )
        , mkTest "NICK after USER"
          (\a -> a
                 >>! "user nickTestUsername1 0 * :Nick Name" >>? nothing >>! "nick nickTest1"
-                >>? "001 :Welcome to the Internet Relay Network nickTest1!nickTestUsername1@Host lookup not implemented"
+                >>? "001 :Welcome to the Internet Relay Network nickTest1!nickTestUsername1@$USERHOST"
                 >>? "002 :Your host is $SERVERNAME, running version $VERSION"
                 >>? "003 :This server was created 0"
                                   )
        , mkTest2 "USER then NICK then NICK. First nick freed, second nick taken."
          (\a b -> do
              a >>! "user nickTestUsername2 0 * :Nick Name" >>? nothing >>! "nick nickTest2"
-               >>? "001 :Welcome to the Internet Relay Network nickTest2!nickTestUsername2@Host lookup not implemented"
+               >>? "001 :Welcome to the Internet Relay Network nickTest2!nickTestUsername2@$USERHOST"
                >>? "002 :Your host is $SERVERNAME, running version $VERSION"
                >>? "003 :This server was created 0"
-               >>! "nick nickTest2.1" >>? "NICK :nickTest2.1"
+               >>! "nick nickTest2.1" >>? ":nickTest2!nickTestUsername2@$USERHOST NICK :nickTest2.1"
              b >>! "nick nickTest2.1" >>? "433 nickTest2.1 :Nickname is already in use"
-               >>! "nick nickTest2" >>! "nick nickTest2.2" >>? "NICK :nickTest2.2"
+               >>! "nick nickTest2" >>! "nick nickTest2.2" >>? ":nickTest2 NICK :nickTest2.2"
          )
        ]
 
@@ -125,7 +148,7 @@ user = [ mkTest "USER with not enough parameters"
        , mkTest "NICK then USER"
          (\a -> a
                 >>! "nick blian" >>? nothing >>! "user brian 0 * :Graham Chapman"
-                >>? "001 :Welcome to the Internet Relay Network blian!brian@Host lookup not implemented"
+                >>? "001 :Welcome to the Internet Relay Network blian!brian@$USERHOST"
                 >>? "002 :Your host is $SERVERNAME, running version $VERSION"
                 >>? "003 :This server was created 0"
          )
@@ -134,7 +157,7 @@ user = [ mkTest "USER with not enough parameters"
                 >>! "user brian2 0 * :Graham Chapman" >>? nothing
                 >>! "user brian2.1 0 * :Graham Chapman" >>? "462 :Unauthorized command (already registered)"
                 >>! "nick blian2"
-                >>? "001 :Welcome to the Internet Relay Network blian2!brian2@Host lookup not implemented"
+                >>? "001 :Welcome to the Internet Relay Network blian2!brian2@$USERHOST"
                 >>? "002 :Your host is $SERVERNAME, running version $VERSION"
                 >>? "003 :This server was created 0"
          )
@@ -142,12 +165,20 @@ user = [ mkTest "USER with not enough parameters"
          (\a -> a
                 >>! "nick blian3" >>? nothing
                 >>! "user brian3 0 * :Graham Chapman"
-                >>? "001 :Welcome to the Internet Relay Network blian3!brian3@Host lookup not implemented"
+                >>? "001 :Welcome to the Internet Relay Network blian3!brian3@$USERHOST"
                 >>? "002 :Your host is $SERVERNAME, running version $VERSION"
                 >>? "003 :This server was created 0"
                 >>! "user brian3.1 0 * :Graham Chapman" >>? "462 :Unauthorized command (already registered)"
          )
        ]
+
+dm :: [Test]
+dm = [ mkTestRegistered2 "Direct message" "dmA" "dmB"
+       (\a b -> do
+           a >>! "privmsg dmB :ohai, how goes?" >>? nothing
+           b >>? ":dmA!dmA@$USERHOST PRIVMSG :ohai, how goes?"
+       )
+     ]
 
 setter :: Test
 setter = mkTest2 "GET and SET" (\a b -> do
@@ -158,7 +189,7 @@ setter = mkTest2 "GET and SET" (\a b -> do
   b >>! "get"              >>? "VALUE :foo bar baz")
 
 tests :: [Test]
-tests = [setter, unknownCommand] ++ nick ++ user
+tests = [setter, unknownCommand] ++ nick ++ user ++ dm
 
 main :: IO ()
 main = do

@@ -44,6 +44,15 @@ mkDatabase = newTVarIO $ Database { dbUserData = UserDataStore Map.empty
 handleToUser :: Database -> Handle -> Maybe User
 handleToUser db h = fmap udUser $ listToMaybe $ Map.elems $ Map.filter ((== h) . udHandle) (byNickname $ dbUserData db)
 
+userDataByNick :: Database -> Nickname -> Maybe UserData
+userDataByNick db n = Map.lookup n (byNickname $ dbUserData db)
+
+handleByNick :: Database -> Nickname -> Maybe Handle
+handleByNick db n = fmap udHandle $ userDataByNick db n
+
+userByNick :: Database -> Nickname -> Maybe User
+userByNick db n = fmap udUser $ userDataByNick db n
+
 isNicknameInUse :: Database -> Nickname -> Bool
 isNicknameInUse db n = Map.member n $ byNickname $ dbUserData db
 

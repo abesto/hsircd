@@ -10,6 +10,8 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
 import Control.Monad (void)
 
+import Data.Maybe (fromJust)
+
 import Control.Lens hiding ((<.>), (.>))
 
 import Parser (parse, message)
@@ -111,23 +113,23 @@ handleMessage (CmdNick n) db ud@(UserData u h)
   | otherwise            = f u .> ud'
 
   where f (UnregisteredUser)     = gen $ saveUser u' h
-        f (NicknameOnlyUser n')  = RplNick n <.> saveUser u' h .> freeNickname n'
+        f (NicknameOnlyUser n')  = RplNick u n <.> saveUser u' h .> freeNickname n'
         f (UserOnlyUser _ _ _ _) = welcome u' <.> saveUser u' h
-        f (FullUser n' _ _ _ _)  = RplNick n <.> saveUser u' h .> freeNickname n'
+        f (FullUser n' _ _ _ _)  = RplNick u n <.> saveUser u' h .> freeNickname n'
                                    -- TODO send to others who should see it
-
         u' = changeNickname n u
         ud' = ud { udUser = u' }
 
 handleMessage (CmdUser username flags realname) _ ud@(UserData u h) = f u
   where f (UnregisteredUser) = gen ud'
-
         f (NicknameOnlyUser _) = welcome u' <.> saveUser u' h .> ud'
-
         f _ = gen ErrAlreadyRegistered
 
         u' = addUserData u username flags realname
         ud' = ud { udUser = u' }
+
+handleMessage (CmdPrivmsg _ _) _ (UserData UnregisteredUser _) = gen ErrNotRegistered
+handleMessage (CmdPrivmsg n m) db (UserData u _) = gen (RTHandle $ fromJust $ handleByNick db n, RplPrivmsg u m)
 
 handleMessage (CmdSet v) _ _ = (\db -> db { dbTest = v }) <.> RplValue v
 
@@ -137,4 +139,4 @@ handleMessage ErrIgnore _ _ = id
 writeMessage :: Database -> Handle -> (RespTarget, MessageOut) -> IO ()
 writeMessage _ sender (RTDirect, m) = hPutStrLn sender $ msgToWire m
 writeMessage _ _ (RTHandle h, m) = hPutStrLn h $ msgToWire m
-writeMessage _ _ (RTUser _, _) = undefined
+writeMessage _ _ (RTUser _, _) = error "writeMessage not yet implemented for RTUser"
