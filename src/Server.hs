@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Server where
 
 import Text.Parsec (ParseError)
@@ -8,10 +10,24 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
 import Control.Monad (void)
 
+import Control.Lens
+
 import Parser (parse, message)
 import Model.Message
 import Model.User
 import Database
+
+data RespTarget = RTUser User
+                | RTDirect
+                | RTHandle Handle
+             -- | RTChannel Channel
+type Replies = [(RespTarget, MessageOut)]
+data Resp = Resp { _respTransaction :: Transaction
+                 , _respReplies :: Replies
+                 , _respUserData :: UserData
+                 }
+
+makeLenses ''Resp
 
 ircNewlineMode :: NewlineMode
 ircNewlineMode = NewlineMode CRLF CRLF
@@ -35,42 +51,23 @@ commandProcessor :: UserData -> TVar Database -> IO ()
 commandProcessor ud@(UserData _ handle) db = do
     -- TODO: if there are too many users online, just return a response and close the connection
     line <- hGetLine handle
-    let msg = parse message line
-    (dbBefore, ud', msgs) <- atomically $ do
+    let m = parse message line
+    (dbBefore, ud', ms) <- atomically $ do
       dbBefore <- readTVar db
-      let Resp dbTransaction msgs ud' = handleEitherRawMessage msg dbBefore ud
+      let Resp dbTransaction ms ud' = handleEitherRawMessage m dbBefore ud (Resp id [] ud)
       writeTVar db $ dbTransaction dbBefore
-      return (dbBefore, ud', msgs)
-    mapM_ (writeMessage dbBefore handle) msgs
+      return (dbBefore, ud', ms)
+    mapM_ (writeMessage dbBefore handle) ms
     commandProcessor ud' db
 
-data RespTarget = RTUser User
-                | RTDirect
-                | RTHandle Handle
-             -- | RTChannel Channel
-type Replies = [(RespTarget, MessageOut)]
-data Resp = Resp Transaction Replies UserData
-
-directT :: Transaction -> [MessageOut] -> UserData -> Resp
-directT t ms = Resp t [(RTDirect, m) | m <- ms]
-
-direct :: [MessageOut] -> UserData -> Resp
-direct = directT id
-
-noResp :: UserData -> Resp
-noResp = Resp id []
-
-noRespT :: Transaction -> UserData -> Resp
-noRespT t = Resp t []
-
-handleEitherRawMessage :: Either ParseError RawMessage -> Database -> UserData -> Resp
+handleEitherRawMessage :: Either ParseError RawMessage -> Database -> UserData -> Resp -> Resp
 handleEitherRawMessage (Right m) db ud = handleEitherMessage (msgFromRaw m) db ud
-handleEitherRawMessage (Left e)   _ ud = direct [ErrParseFailed details] ud
+handleEitherRawMessage (Left e)   _ _  = reply $ ErrParseFailed details
     where details = map (\c -> if c == '\n' then ' ' else c) $ show e
 
-handleEitherMessage :: Either MessageOut MessageIn -> Database -> UserData -> Resp
+handleEitherMessage :: Either MessageOut MessageIn -> Database -> UserData -> Resp -> Resp
 handleEitherMessage (Right m) db ud = handleMessage m db ud
-handleEitherMessage (Left m) _ ud = direct [m] ud
+handleEitherMessage (Left m) _ _ = reply m
 
 welcome :: User -> [MessageOut]
 welcome u = [ RplWelcome u
@@ -80,26 +77,63 @@ welcome u = [ RplWelcome u
             -- TODO 004 (RPL_MYINFO)
             ]
 
-handleMessage ::  MessageIn -> Database -> UserData -> Resp
+msg :: RespTarget -> MessageOut -> Resp -> Resp
+msg t m r = r & respReplies %~ ((t, m):)
+
+msgs :: Replies -> Resp -> Resp
+msgs rs r = r & respReplies %~ (++ rs)
+
+reply :: MessageOut -> (Resp -> Resp)
+reply = msg RTDirect
+
+replies :: [MessageOut] -> Resp -> Resp
+replies ms = msgs [(RTDirect, m) | m <- ms]
+
+mdb :: Transaction -> Resp -> Resp
+mdb t r = r & respTransaction %~ (. t)
+
+userData :: UserData -> Resp -> Resp
+userData ud r = r & respUserData .~ ud
+
+handleMessage ::  MessageIn -> Database -> UserData -> (Resp -> Resp)
 handleMessage (CmdNick n) db ud@(UserData u h)
-  | isNicknameInUse db n = direct [ErrNicknameInUse n] ud
-  | otherwise            = f u ud'
-  where f (UnregisteredUser)     = noRespT (saveUser u' h)
-        f (NicknameOnlyUser n')  = directT (saveUser u' h . freeNickname n') [RplNick n]
-        f (UserOnlyUser _ _ _ _) = directT (saveUser u' h) (welcome u')
-        f (FullUser n' _ _ _ _)  = directT (saveUser u' h . freeNickname n') [RplNick n]  -- TODO send to others who should see it
+  | isNicknameInUse db n = reply $ ErrNicknameInUse n
+  | otherwise            = f u . userData ud'
+
+  where f (UnregisteredUser)     = mdb $ saveUser u' h
+
+        f (NicknameOnlyUser n')  = (reply $ RplNick n) .
+                                   (mdb $ saveUser u' h) .
+                                   (mdb $ freeNickname n')
+
+        f (UserOnlyUser _ _ _ _) = (replies $ welcome u') .
+                                   (mdb $ saveUser u' h)
+
+        f (FullUser n' _ _ _ _)  = (reply $ RplNick n) .
+                                   (mdb $ saveUser u' h) .
+                                   (mdb $ freeNickname n')
+                                   -- TODO send to others who should see it
+
         u' = changeNickname n u
         ud' = ud { udUser = u' }
+
 handleMessage (CmdUser username flags realname) _ ud@(UserData u h) = f u
-  where f (UnregisteredUser) = noResp ud'
-        f (NicknameOnlyUser _) = directT (saveUser u' h) (welcome u') ud'
-        f _ = directT id [ErrAlreadyRegistered] ud
+  where f (UnregisteredUser) = userData ud'
+
+        f (NicknameOnlyUser _) = (replies $ welcome u') .
+                                 (mdb $ saveUser u' h) .
+                                 (userData ud')
+
+        f _ = reply ErrAlreadyRegistered
+
         u' = addUserData u username flags realname
         ud' = ud { udUser = u' }
-handleMessage (CmdSet v) _ ud = directT (\db -> db { dbTest = v }) [RplValue v] ud
-handleMessage CmdGet db ud = direct [RplValue $ dbTest db] ud
-handleMessage ErrIgnore _ ud = noResp ud
 
+handleMessage (CmdSet v) _ _ = (mdb (\db -> db { dbTest = v })) .
+                               (reply $ RplValue v)
+
+handleMessage CmdGet db _ = reply $ RplValue $ dbTest db
+handleMessage ErrIgnore _ _ = id
 
 writeMessage :: Database -> Handle -> (RespTarget, MessageOut) -> IO ()
 writeMessage _ sender (RTDirect, m) = hPutStrLn sender $ msgToWire m

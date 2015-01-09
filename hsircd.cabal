@@ -13,6 +13,7 @@ library
                  , stm
                  , containers
                  , syb
+                 , lens
   exposed-modules: Database
                  , Model.Channel
                  , Model.Command
