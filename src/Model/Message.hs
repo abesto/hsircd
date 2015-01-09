@@ -28,6 +28,7 @@ data MessageOut = RplNick { rplNickOldUser :: User, rplNickNewNick :: String }
                 | RplYourHost String String
                 | RplCreated Integer
                 -- numeric error replies
+                | ErrNoSuchNick String
                 | ErrUnknownCommand String
                 | ErrNoNicknameGiven
                 | ErrNicknameInUse Nickname
@@ -76,6 +77,8 @@ msgToRaw (RplPrivmsg u m)         = mkRaw (Just $ prefixFromUser u) Privmsg [m]
 msgToRaw (RplWelcome u)           = mkRaw Nothing (NumericReply 001) ["Welcome to the Internet Relay Network " ++ show u]
 msgToRaw (RplYourHost s v)        = mkRaw Nothing (NumericReply 002) ["Your host is " ++ s ++ ", running version " ++ v]
 msgToRaw (RplCreated c)           = mkRaw Nothing (NumericReply 003) ["This server was created " ++ show c]
+
+msgToRaw (ErrNoSuchNick n)        = mkRaw Nothing (NumericReply 401) [n, "No such nick/channel"]
 msgToRaw (ErrUnknownCommand c)    = mkRaw Nothing (NumericReply 421) [c, "Unknown command"]
 msgToRaw ErrNoNicknameGiven       = mkRaw Nothing (NumericReply 431) ["No nickname given"]
 msgToRaw (ErrNicknameInUse n)     = mkRaw Nothing (NumericReply 433) [n, "Nickname is already in use"]

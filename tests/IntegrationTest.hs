@@ -91,6 +91,12 @@ mkTest n f = Test n (withClient "A" f) []
 mkTest2 :: String -> (IO Client -> IO Client -> IO a) -> Test
 mkTest2 n f = Test n (with2Clients "A" "B" f) []
 
+mkTestRegistered :: String -> String -> (IO Client -> IO a) -> Test
+mkTestRegistered n na f = mkTest n f'
+  where f' a = do
+          a' <- register na a
+          f (return a')
+
 mkTestRegistered2 :: String -> String -> String -> (IO Client -> IO Client -> IO a) -> Test
 mkTestRegistered2 n na nb f = mkTest2 n f'
   where f' a b = do
@@ -178,6 +184,8 @@ dm = [ mkTestRegistered2 "Direct message" "dmA" "dmB"
            a >>! "privmsg dmB :ohai, how goes?" >>? nothing
            b >>? ":dmA!dmA@$USERHOST PRIVMSG :ohai, how goes?"
        )
+     , mkTestRegistered "Direct message to nonexistent user" "dmNoSuchNickSender"
+       (\a -> a >>! "privmsg dmNoSuchNickReceiver foobar" >>? "401 dmNoSuchNickReceiver :No such nick/channel")
      ]
 
 setter :: Test

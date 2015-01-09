@@ -10,8 +10,6 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
 import Control.Monad (void)
 
-import Data.Maybe (fromJust)
-
 import Control.Lens hiding ((<.>), (.>))
 
 import Parser (parse, message)
@@ -129,7 +127,9 @@ handleMessage (CmdUser username flags realname) _ ud@(UserData u h) = f u
         ud' = ud { udUser = u' }
 
 handleMessage (CmdPrivmsg _ _) _ (UserData UnregisteredUser _) = gen ErrNotRegistered
-handleMessage (CmdPrivmsg n m) db (UserData u _) = gen (RTHandle $ fromJust $ handleByNick db n, RplPrivmsg u m)
+handleMessage (CmdPrivmsg n m) db (UserData u _) = f $ handleByNick db n
+  where f Nothing  = gen $ ErrNoSuchNick n
+        f (Just h) = gen (RTHandle h, RplPrivmsg u m)
 
 handleMessage (CmdSet v) _ _ = (\db -> db { dbTest = v }) <.> RplValue v
 
