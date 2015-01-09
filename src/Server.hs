@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, TypeSynonymInstances, FlexibleInstances #-}
 
 module Server where
 
@@ -10,7 +10,7 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
 import Control.Monad (void)
 
-import Control.Lens
+import Control.Lens hiding ((<.>), (.>))
 
 import Parser (parse, message)
 import Model.Message
@@ -21,7 +21,8 @@ data RespTarget = RTUser User
                 | RTDirect
                 | RTHandle Handle
              -- | RTChannel Channel
-type Replies = [(RespTarget, MessageOut)]
+type Reply = (RespTarget, MessageOut)
+type Replies = [Reply]
 data Resp = Resp { _respTransaction :: Transaction
                  , _respReplies :: Replies
                  , _respUserData :: UserData
@@ -62,12 +63,12 @@ commandProcessor ud@(UserData _ handle) db = do
 
 handleEitherRawMessage :: Either ParseError RawMessage -> Database -> UserData -> Resp -> Resp
 handleEitherRawMessage (Right m) db ud = handleEitherMessage (msgFromRaw m) db ud
-handleEitherRawMessage (Left e)   _ _  = reply $ ErrParseFailed details
+handleEitherRawMessage (Left e)   _ _  = gen $ ErrParseFailed details
     where details = map (\c -> if c == '\n' then ' ' else c) $ show e
 
 handleEitherMessage :: Either MessageOut MessageIn -> Database -> UserData -> Resp -> Resp
 handleEitherMessage (Right m) db ud = handleMessage m db ud
-handleEitherMessage (Left m) _ _ = reply m
+handleEitherMessage (Left m) _ _ = gen m
 
 welcome :: User -> [MessageOut]
 welcome u = [ RplWelcome u
@@ -77,62 +78,60 @@ welcome u = [ RplWelcome u
             -- TODO 004 (RPL_MYINFO)
             ]
 
-msg :: RespTarget -> MessageOut -> Resp -> Resp
-msg t m r = r & respReplies %~ ((t, m):)
+class Gen a where
+  gen :: a -> Resp -> Resp
 
-msgs :: Replies -> Resp -> Resp
-msgs rs r = r & respReplies %~ (++ rs)
+(.>) :: (Gen a) => (Resp -> Resp) -> a -> (Resp -> Resp)
+l .> x = l . (gen x)
 
-reply :: MessageOut -> (Resp -> Resp)
-reply = msg RTDirect
+(<.>) :: (Gen a, Gen b) => a -> b -> Resp -> Resp
+l <.> r = (gen l) . (gen r)
 
-replies :: [MessageOut] -> Resp -> Resp
-replies ms = msgs [(RTDirect, m) | m <- ms]
+instance Gen Transaction where
+  gen t r = r & respTransaction %~ (. t)
 
-mdb :: Transaction -> Resp -> Resp
-mdb t r = r & respTransaction %~ (. t)
+instance Gen Reply where
+  gen (t, m) r = r & respReplies %~ ((t, m):)
 
-userData :: UserData -> Resp -> Resp
-userData ud r = r & respUserData .~ ud
+instance Gen Replies where
+  gen rs r = r & respReplies %~ (++ rs)
+
+instance Gen MessageOut where
+  gen m = gen (RTDirect, m)
+
+instance Gen [MessageOut] where
+  gen ms = gen [(RTDirect, m) | m <- ms]
+
+instance Gen UserData where
+  gen ud r = r & respUserData .~ ud
 
 handleMessage ::  MessageIn -> Database -> UserData -> (Resp -> Resp)
 handleMessage (CmdNick n) db ud@(UserData u h)
-  | isNicknameInUse db n = reply $ ErrNicknameInUse n
-  | otherwise            = f u . userData ud'
+  | isNicknameInUse db n = gen $ ErrNicknameInUse n
+  | otherwise            = f u .> ud'
 
-  where f (UnregisteredUser)     = mdb $ saveUser u' h
-
-        f (NicknameOnlyUser n')  = (reply $ RplNick n) .
-                                   (mdb $ saveUser u' h) .
-                                   (mdb $ freeNickname n')
-
-        f (UserOnlyUser _ _ _ _) = (replies $ welcome u') .
-                                   (mdb $ saveUser u' h)
-
-        f (FullUser n' _ _ _ _)  = (reply $ RplNick n) .
-                                   (mdb $ saveUser u' h) .
-                                   (mdb $ freeNickname n')
+  where f (UnregisteredUser)     = gen $ saveUser u' h
+        f (NicknameOnlyUser n')  = RplNick n <.> saveUser u' h .> freeNickname n'
+        f (UserOnlyUser _ _ _ _) = welcome u' <.> saveUser u' h
+        f (FullUser n' _ _ _ _)  = RplNick n <.> saveUser u' h .> freeNickname n'
                                    -- TODO send to others who should see it
 
         u' = changeNickname n u
         ud' = ud { udUser = u' }
 
 handleMessage (CmdUser username flags realname) _ ud@(UserData u h) = f u
-  where f (UnregisteredUser) = userData ud'
+  where f (UnregisteredUser) = gen ud'
 
-        f (NicknameOnlyUser _) = (replies $ welcome u') .
-                                 (mdb $ saveUser u' h) .
-                                 (userData ud')
+        f (NicknameOnlyUser _) = welcome u' <.> saveUser u' h .> ud'
 
-        f _ = reply ErrAlreadyRegistered
+        f _ = gen ErrAlreadyRegistered
 
         u' = addUserData u username flags realname
         ud' = ud { udUser = u' }
 
-handleMessage (CmdSet v) _ _ = (mdb (\db -> db { dbTest = v })) .
-                               (reply $ RplValue v)
+handleMessage (CmdSet v) _ _ = (\db -> db { dbTest = v }) <.> RplValue v
 
-handleMessage CmdGet db _ = reply $ RplValue $ dbTest db
+handleMessage CmdGet db _ = gen $ RplValue $ dbTest db
 handleMessage ErrIgnore _ _ = id
 
 writeMessage :: Database -> Handle -> (RespTarget, MessageOut) -> IO ()
