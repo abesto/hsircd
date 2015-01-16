@@ -100,13 +100,13 @@ l .> x = l . (gen x)
 l <.> r = (gen l) . (gen r)
 
 instance Gen Transaction where
-  gen t r = r & respTransaction %~ (. t)
+  gen t = respTransaction %~ (. t)
 
 instance Gen Reply where
-  gen (t, m) r = r & respReplies %~ ((t, m):)
+  gen (t, m) = respReplies %~ ((t, m):)
 
 instance Gen Replies where
-  gen rs r = r & respReplies %~ (++ rs)
+  gen rs = respReplies %~ (++ rs)
 
 instance Gen MessageOut where
   gen m = gen (RTDirect, m)
@@ -115,7 +115,7 @@ instance Gen [MessageOut] where
   gen ms = gen [(RTDirect, m) | m <- ms]
 
 instance Gen UserData where
-  gen ud r = r & respUserData .~ ud
+  gen ud = respUserData .~ ud
 
 handleMessage ::  MessageIn -> Database -> UserData -> (Resp -> Resp)
 handleMessage (CmdNick n) db ud@(UserData u h)
