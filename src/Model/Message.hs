@@ -2,22 +2,17 @@ module Model.Message where
 
 import Data.List (intercalate)
 
+import Model.RawMessage
+import Model.MessageTo
 import Model.Prefix
 import Model.Command
 import Model.User
 
-data RawMessage = RawMessage { msgPrefix :: Maybe Prefix
-                             , msgCommand :: Command
-                             , msgParams :: [String]
-                             }
-               deriving (Eq, Show)
-
-mkRaw :: Maybe Prefix -> Command -> [String] -> RawMessage
-mkRaw = RawMessage
+import Parser
 
 data MessageIn = CmdNick String
                | CmdUser { cmdUserUsername :: String, cmdUserFlags :: UserFlags, cmdUserRealname :: String }
-               | CmdPrivmsg { cmdPrivmsgTo :: String, cmgPrivmsgMsg :: String }  -- TODO parse msgTo in Parser.hs
+               | CmdPrivmsg { cmdPrivmsgTo :: MessageTo, cmgPrivmsgMsg :: String }  -- TODO parse msgTo in Parser.hs
                | CmdGet | CmdSet String
                | ErrIgnore  -- For example if a user sends a numeric response as a command
 
@@ -65,7 +60,9 @@ fromRaw _ Nick [] = Left $ ErrNoNicknameGiven
 fromRaw _ User (username:mode:_:realname:_) = Right $ CmdUser username (mkUserFlags mode) realname
 fromRaw _ User _ = Left $ ErrNeedMoreParams User
 -- PRIVMSG
-fromRaw _ Privmsg (to:msg:_) = Right $ CmdPrivmsg to msg
+fromRaw _ Privmsg (to:msg:_) = f $ parse msgtarget to
+  where f (Right to') = Right $ CmdPrivmsg to' msg
+        f (Left err) = Left $ ErrParseFailed $ show err
 -- Other
 fromRaw _ (UnknownCommand c) _ = Left $ ErrUnknownCommand c
 fromRaw _ _ _ = Right $ ErrIgnore

@@ -13,7 +13,9 @@ import Control.Monad (void)
 import Control.Lens hiding ((<.>), (.>))
 
 import Parser (parse, message)
+import Model.RawMessage
 import Model.Message
+import Model.MessageTo
 import Model.User
 import Database
 
@@ -127,7 +129,7 @@ handleMessage (CmdUser username flags realname) _ ud@(UserData u h) = f u
         ud' = ud { udUser = u' }
 
 handleMessage (CmdPrivmsg _ _) _ (UserData UnregisteredUser _) = gen ErrNotRegistered
-handleMessage (CmdPrivmsg n m) db (UserData u _) = f $ handleByNick db n
+handleMessage (CmdPrivmsg (MessageToN n) m) db (UserData u _) = f $ handleByNick db n
   where f Nothing  = gen $ ErrNoSuchNick n
         f (Just h) = gen (RTHandle h, RplPrivmsg u m)
 
@@ -135,6 +137,8 @@ handleMessage (CmdSet v) _ _ = (\db -> db { dbTest = v }) <.> RplValue v
 
 handleMessage CmdGet db _ = gen $ RplValue $ dbTest db
 handleMessage ErrIgnore _ _ = id
+
+handleMessage _ _ _ = id
 
 writeMessage :: Database -> Handle -> (RespTarget, MessageOut) -> IO ()
 writeMessage _ sender (RTDirect, m) = hPutStrLn sender $ msgToWire m

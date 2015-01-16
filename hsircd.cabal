@@ -19,6 +19,8 @@ library
                  , Model.Command
                  , Model.Encoding
                  , Model.Message
+                 , Model.RawMessage
+                 , Model.MessageTo
                  , Model.Prefix
                  , Model.User
                  , Parser

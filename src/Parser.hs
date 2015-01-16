@@ -14,7 +14,8 @@ import Control.Monad (void)
 import Model.Channel
 import Model.Command
 import Model.Prefix
-import Model.Message
+import Model.RawMessage
+import Model.MessageTo
 
 
 type Parser st r = Parsec String st r
@@ -134,6 +135,16 @@ special = oneOf (map chr $ [0x5B..0x60] ++ [0x7B..0x7D])
 
 space :: Parser st Char
 space = char ' '
+
+msgtarget :: Parser st MessageTo
+msgtarget = (c <|> uhs <|> uh <|> us <|> n <|> nuh) <* eof
+  where c   = try $ MessageToC   <$> channelParser
+        uhs = try $ MessageToUHS <$> user <* char '%' <*> host <* char '@' <*> servername
+        uh  = try $ MessageToUH  <$> user <* char '%' <*> host
+        us  = try $ MessageToUS  <$> user <* char '@' <*> servername
+        n   = try $ MessageToN   <$> nickname
+        nuh = try $ MessageToNUH <$> nickname <* char '!' <*> user <* char '@' <*> host
+
 
 -- Helpers not defined in the RFC
 

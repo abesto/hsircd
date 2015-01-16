@@ -4,8 +4,6 @@ module Model.Command where
 import Data.Char
 import Data.Data
 
--- TODO: add parameters to command arguments
-
 data Command = UnknownCommand String | NumericReply Int | Error
              | Join | Nick | User | Privmsg
              -- stuff used for testing
