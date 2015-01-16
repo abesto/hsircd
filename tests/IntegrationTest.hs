@@ -131,20 +131,19 @@ nick = [ mkTest "NICK without nick name"
          )
        , mkTest "NICK after USER"
          (\a -> a
-                >>! "user nickTestUsername1 0 * :Nick Name" >>? nothing >>! "nick nickTest1"
-                >>? "001 :Welcome to the Internet Relay Network nickTest1!nickTestUsername1@$USERHOST"
+                >>! "user nickTestUsername1 0 * :Nick Name" >>? nothing >>! "nick nickT1"
+                >>? "001 :Welcome to the Internet Relay Network nickT1!nickTestUsername1@$USERHOST"
                 >>? "002 :Your host is $SERVERNAME, running version $VERSION"
-                >>? "003 :This server was created 0"
-                                  )
+                >>? "003 :This server was created 0")
        , mkTest2 "USER then NICK then NICK. First nick freed, second nick taken."
          (\a b -> do
-             a >>! "user nickTestUsername2 0 * :Nick Name" >>? nothing >>! "nick nickTest2"
-               >>? "001 :Welcome to the Internet Relay Network nickTest2!nickTestUsername2@$USERHOST"
+             a >>! "user nickTestUsername2 0 * :Nick Name" >>? nothing >>! "nick nickT2"
+               >>? "001 :Welcome to the Internet Relay Network nickT2!nickTestUsername2@$USERHOST"
                >>? "002 :Your host is $SERVERNAME, running version $VERSION"
                >>? "003 :This server was created 0"
-               >>! "nick nickTest2.1" >>? ":nickTest2!nickTestUsername2@$USERHOST NICK :nickTest2.1"
-             b >>! "nick nickTest2.1" >>? "433 nickTest2.1 :Nickname is already in use"
-               >>! "nick nickTest2" >>! "nick nickTest2.2" >>? ":nickTest2 NICK :nickTest2.2"
+               >>! "nick nickT2.1" >>? ":nickT2!nickTestUsername2@$USERHOST NICK :nickT2.1"
+             b >>! "nick nickT2.1" >>? "433 nickT2.1 :Nickname is already in use"
+               >>! "nick nickT2" >>! "nick nickT2.2" >>? ":nickT2 NICK :nickT2.2"
          )
        ]
 
@@ -179,13 +178,16 @@ user = [ mkTest "USER with not enough parameters"
        ]
 
 dm :: [Test]
-dm = [ mkTestRegistered2 "Direct message" "dmA" "dmB"
+dm = [ mkTestRegistered2 "Direct message" "dm1a" "dm1b"
        (\a b -> do
-           a >>! "privmsg dmB :ohai, how goes?" >>? nothing
-           b >>? ":dmA!dmA@$USERHOST PRIVMSG :ohai, how goes?"
+           a >>! "privmsg dm1b :ohai, how goes?" >>? nothing
+           b >>? ":dm1a!dm1a@$USERHOST PRIVMSG :ohai, how goes?"
        )
-     , mkTestRegistered "Direct message to nonexistent user" "dmNoSuchNickSender"
-       (\a -> a >>! "privmsg dmNoSuchNickReceiver foobar" >>? "401 dmNoSuchNickReceiver :No such nick/channel")
+     , mkTestRegistered "Direct message to nonexistent user" "dm2a"
+       (\a -> a >>! "privmsg dm2b foobar" >>? "401 dm2b :No such nick/channel")
+     , mkTestRegistered "Direct message to too long nick" "dm3a"
+       (\a -> a >>! "privmsg dm3bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb foo"
+              >>? "401 dm3bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb :No such nick/channel")
      ]
 
 setter :: Test

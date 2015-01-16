@@ -8,6 +8,7 @@ import Model.Prefix
 import Model.Command
 import Model.User
 
+import Config
 import Parser
 
 data MessageIn = CmdNick String
@@ -54,7 +55,7 @@ fromRaw _ Get _ = Right CmdGet
 fromRaw _ Set (val:_) = Right $ CmdSet val
 fromRaw _ Set _ = Left $ ErrNeedMoreParams Set
 -- NICK
-fromRaw _ Nick (nick:_) = Right $ CmdNick nick
+fromRaw _ Nick (nick:_) = Right $ CmdNick $ take nicklen $ nick
 fromRaw _ Nick [] = Left $ ErrNoNicknameGiven
 -- USER
 fromRaw _ User (username:mode:_:realname:_) = Right $ CmdUser username (mkUserFlags mode) realname

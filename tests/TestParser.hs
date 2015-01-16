@@ -11,7 +11,7 @@ import Control.Applicative ((<*))
 import Parser
 import Model.Command
 import Model.Prefix
-import Model.Message
+import Model.RawMessage
 
 -- Can (must?) be removed once a Parsec with
 -- https://github.com/aslatter/parsec/pull/14

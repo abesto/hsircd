@@ -15,6 +15,7 @@ library
                  , syb
                  , lens
   exposed-modules: Database
+                 , Config
                  , Model.Channel
                  , Model.Command
                  , Model.Encoding

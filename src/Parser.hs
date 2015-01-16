@@ -125,7 +125,7 @@ ip6addr = ((\a b c d -> a ++ b ++ c ++ d)
           <?> "ip6addr"
 
 nickname :: Parser st String
-nickname = (:) <$> (letter <|> special) <*> times "nickname char" 0 8 (flip count $ letter <|> digit <|> special <|> char '-')
+nickname = (:) <$> (letter <|> special) <*> many1 (letter <|> digit <|> special <|> char '-')
 
 user :: Parser st String
 user = many1 $ noneOf "\NUL\CR\LF @"
