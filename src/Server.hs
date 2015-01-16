@@ -4,11 +4,10 @@ module Server where
 
 import Text.Parsec (ParseError)
 import Network (listenOn, withSocketsDo, accept, PortID(..), Socket)
-import System.IO (hSetBuffering, hSetNewlineMode, NewlineMode(..), Newline(CRLF), hGetLine, hPutStrLn, BufferMode(..)
-                 , Handle)
+import System.IO (hSetBuffering, hGetChar, hPutStrLn, BufferMode(..) , Handle)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
-import Control.Monad (void)
+import Control.Monad (void, unless)
 
 import Control.Lens hiding ((<.>), (.>))
 
@@ -32,9 +31,6 @@ data Resp = Resp { _respTransaction :: Transaction
 
 makeLenses ''Resp
 
-ircNewlineMode :: NewlineMode
-ircNewlineMode = NewlineMode CRLF CRLF
-
 run :: IO ()
 run = withSocketsDo $ do
  db <- mkDatabase
@@ -46,14 +42,28 @@ sockHandler :: Socket -> TVar Database -> IO ()
 sockHandler sock db = do
     (handle, _, _) <- accept sock
     hSetBuffering handle NoBuffering
-    hSetNewlineMode handle ircNewlineMode
     void $ forkIO $ commandProcessor (mkUserData handle) db
     sockHandler sock db
+
+hSkipUntilNewline :: Handle -> Char -> IO ()
+hSkipUntilNewline h c = do
+  c' <- hGetChar h
+  unless (c == '\r' && c' == '\n') (hSkipUntilNewline h c')
+
+hGetLine' :: Handle -> IO String
+hGetLine' = hGetLineLoop' 512 ""
+
+hGetLineLoop' :: Int -> String -> Handle -> IO String
+hGetLineLoop' n a h = hGetChar h >>= (\c -> f $ c:a)
+  where f a'
+          | take 2 a' == "\n\r" = return $ reverse $ drop 2 $ a'
+          | n == 0              = hSkipUntilNewline h (head a') >> return a'
+          | otherwise           = hGetLineLoop' (n-1) a' h
 
 commandProcessor :: UserData -> TVar Database -> IO ()
 commandProcessor ud@(UserData _ handle) db = do
     -- TODO: if there are too many users online, just return a response and close the connection
-    line <- hGetLine handle
+    line <- hGetLine' handle
     let m = parse message line
     (dbBefore, ud', ms) <- atomically $ do
       dbBefore <- readTVar db
