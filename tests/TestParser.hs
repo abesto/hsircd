@@ -13,12 +13,6 @@ import Model.Command
 import Model.Prefix
 import Model.RawMessage
 
--- Can (must?) be removed once a Parsec with
--- https://github.com/aslatter/parsec/pull/14
--- is released
-instance Eq P.ParseError where
-  (==) = (==) `on` show
-
 assertParse :: (Show a, Eq a) => P.Parsec P.SourceName () a -> TestName -> a -> TestTree
 assertParse parser input expected = testCase input $
     parse parser input @?= Right expected
