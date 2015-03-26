@@ -88,7 +88,6 @@ parserTests = testGroup "Parser"
       [ assertParse nickname "abesto" "abesto"
       , assertParse nickname "f1oo_bar^" "f1oo_bar^"
       , assertParse nickname "_23456789" "_23456789"
-      , assertParseError (nickname <* endOfWord) "_234567890" []
       ]
     , testGroup "Prefix"
       [ assertParse prefix "127.0.0.1" $ ServerNamePrefix "127.0.0.1"

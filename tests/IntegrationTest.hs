@@ -117,6 +117,9 @@ unknownCommand = mkTest "Unknown command FOO" (\a -> a >>! "Foo" >>? "421 FOO :U
 nick :: [Test]
 nick = [ mkTest "NICK without nick name"
          (\a -> a >>! "nick" >>? "431 :No nickname given")
+       , mkTest "NICK with too long nickname"
+         (\a -> a >>! "nick n1" >>? nothing
+                  >>! "nick _234567890" >>? ":n1 NICK :_2345678")
        , mkTest2 "NICK to already existing nickname"
          (\a b -> do
              a >>! "nick root" >>? nothing
